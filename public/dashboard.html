@@ -266,26 +266,43 @@ textarea { resize: vertical; min-height: 140px; font-family: 'JetBrains Mono', m
         </div>
         <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.5rem;align-items:start">
           <div class="card">
-            <div class="card-header"><span class="card-title">Upload Script</span></div>
-            <div class="card-body">
-              <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" ondrop="handleDrop(event)" ondragover="e => {e.preventDefault(); document.getElementById('upload-zone').classList.add('drag')}" ondragleave="document.getElementById('upload-zone').classList.remove('drag')">
-                <div class="upload-icon">📁</div>
-                <div class="upload-text"><strong>Click to upload</strong> or drag & drop</div>
-                <div class="upload-text" style="margin-top:0.35rem;font-size:0.75rem">.lua files only</div>
+            <div class="card-header">
+              <span class="card-title">Script Source</span>
+              <div style="display:flex;gap:0.4rem">
+                <button class="btn btn-sm" id="tab-paste" onclick="switchTab('paste')" style="background:rgba(124,58,237,0.2);color:#a78bfa;border:1px solid rgba(124,58,237,0.3)">✏️ Paste Code</button>
+                <button class="btn btn-ghost btn-sm" id="tab-upload" onclick="switchTab('upload')">📁 Upload File</button>
               </div>
-              <input type="file" id="file-input" accept=".lua,.txt" style="display:none" onchange="handleFileSelect(event)">
-              <div id="file-preview" style="display:none;margin-top:1rem">
-                <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem">
-                  <div style="display:flex;align-items:center;gap:0.6rem">
-                    <span>📄</span>
-                    <div>
-                      <div style="font-size:0.8rem;font-weight:600" id="file-name">script.lua</div>
-                      <div style="font-size:0.7rem;color:var(--muted)" id="file-size">0 KB</div>
+            </div>
+            <div class="card-body">
+              <!-- Paste tab -->
+              <div id="pane-paste">
+                <textarea id="paste-area" placeholder="-- Paste your Lua script here...
+local Players = game:GetService('Players')
+local lp = Players.LocalPlayer
+-- your code..." style="min-height:220px;font-size:0.78rem"></textarea>
+              </div>
+              <!-- Upload tab -->
+              <div id="pane-upload" style="display:none">
+                <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()" ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="document.getElementById('upload-zone').classList.remove('drag')">
+                  <div class="upload-icon">📁</div>
+                  <div class="upload-text"><strong>Click to upload</strong> or drag & drop</div>
+                  <div class="upload-text" style="margin-top:0.35rem;font-size:0.75rem">.lua files only</div>
+                </div>
+                <input type="file" id="file-input" accept=".lua,.txt" style="display:none" onchange="handleFileSelect(event)">
+                <div id="file-preview" style="display:none;margin-top:1rem">
+                  <div style="display:flex;align-items:center;justify-content:space-between;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:0.75rem 1rem">
+                    <div style="display:flex;align-items:center;gap:0.6rem">
+                      <span>📄</span>
+                      <div>
+                        <div style="font-size:0.8rem;font-weight:600" id="file-name">script.lua</div>
+                        <div style="font-size:0.7rem;color:var(--muted)" id="file-size">0 KB</div>
+                      </div>
                     </div>
+                    <button class="btn btn-ghost btn-sm" onclick="clearFile()">✕</button>
                   </div>
-                  <button class="btn btn-ghost btn-sm" onclick="clearFile()">✕</button>
                 </div>
               </div>
+              <!-- Shared options -->
               <div style="margin-top:1rem">
                 <div class="form-row">
                   <div class="form-group" style="margin-bottom:0">
@@ -644,13 +661,39 @@ function clearFile() {
   document.getElementById('file-input').value = '';
 }
 
+// ── Tab switcher ───────────────────────────────────────────────────────────
+let activeTab = 'paste';
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('pane-paste').style.display  = tab === 'paste'  ? 'block' : 'none';
+  document.getElementById('pane-upload').style.display = tab === 'upload' ? 'block' : 'none';
+  const pasteBtn  = document.getElementById('tab-paste');
+  const uploadBtn = document.getElementById('tab-upload');
+  pasteBtn.style.background  = tab === 'paste'  ? 'rgba(124,58,237,0.2)' : 'transparent';
+  pasteBtn.style.color       = tab === 'paste'  ? '#a78bfa' : 'var(--text)';
+  pasteBtn.style.border      = tab === 'paste'  ? '1px solid rgba(124,58,237,0.3)' : '1px solid var(--border)';
+  uploadBtn.style.background = tab === 'upload' ? 'rgba(124,58,237,0.2)' : 'transparent';
+  uploadBtn.style.color      = tab === 'upload' ? '#a78bfa' : 'var(--text)';
+  uploadBtn.style.border     = tab === 'upload' ? '1px solid rgba(124,58,237,0.3)' : '1px solid var(--border)';
+}
+function handleDragOver(e) { e.preventDefault(); document.getElementById('upload-zone').classList.add('drag'); }
+
 // ── Protect script ─────────────────────────────────────────────────────────
 function protectScript() {
-  if (!currentFileContent) { notify('Upload a script first', 'var(--danger)'); return; }
-  const name = document.getElementById('script-name').value || currentFile?.name || 'script';
+  // get source from whichever tab is active
+  const src = activeTab === 'paste'
+    ? document.getElementById('paste-area').value.trim()
+    : currentFileContent;
+  if (!src) {
+    notify(activeTab === 'paste' ? 'Paste your script first' : 'Upload a script first', 'var(--danger)');
+    return;
+  }
+  const name = document.getElementById('script-name').value
+    || (activeTab === 'upload' ? currentFile?.name?.replace(/\.lua$|\.txt$/,'') : null)
+    || 'script';
   const prot = document.getElementById('prot-level').value;
   const id = genId();
-  const protected_src = obfuscateLua(currentFileContent);
+  const protected_src = obfuscateLua(src);
   const script = { id, name, protection: prot === 'galactic' ? 'Galactic V2' : prot === 'max' ? 'Max' : 'Standard', added: Date.now(), keyCount: 0, src: protected_src };
   SCRIPTS.unshift(script); save();
   const loader = makeLoader(script, '', 'minimal');
