@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>0.6xd Protection – Industrial-Grade Lua Security</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #050508;
+    --bg2: #0a0a12;
+    --card: #0e0e1a;
+    --card2: #12121f;
+    --border: #1e1e35;
+    --accent: #7c3aed;
+    --accent2: #6d28d9;
+    --glow: #7c3aed44;
+    --blue: #3b82f6;
+    --cyan: #06b6d4;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --success: #10b981;
+  }
+
+  html { scroll-behavior: smooth; }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; overflow-x: hidden; }
+
+  /* ── Canvas ── */
+  #particle-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+
+  /* ── Nav ── */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 2rem; height: 64px;
+    background: rgba(5,5,8,0.85); backdrop-filter: blur(20px);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.15rem; }
+  .nav-logo .badge {
+    background: linear-gradient(135deg, var(--accent), var(--blue));
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 900;
+  }
+  .nav-links { display: flex; gap: 2rem; }
+  .nav-links a { color: var(--muted); text-decoration: none; font-size: 0.875rem; font-weight: 500; transition: color 0.2s; }
+  .nav-links a:hover { color: var(--text); }
+  .nav-cta { display: flex; gap: 0.75rem; }
+  .btn { padding: 0.5rem 1.25rem; border-radius: 8px; font-size: 0.875rem; font-weight: 600; cursor: pointer; border: none; text-decoration: none; transition: all 0.2s; display: inline-flex; align-items: center; gap: 0.4rem; }
+  .btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); }
+  .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; box-shadow: 0 0 20px var(--glow); }
+  .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 0 30px var(--glow); }
+  .btn-lg { padding: 0.875rem 2rem; font-size: 1rem; border-radius: 10px; }
+
+  /* ── Hero ── */
+  .hero {
+    position: relative; z-index: 1;
+    min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 6rem 2rem 4rem;
+  }
+  .hero-pill {
+    display: inline-flex; align-items: center; gap: 0.5rem;
+    background: rgba(124,58,237,0.12); border: 1px solid rgba(124,58,237,0.3);
+    padding: 0.4rem 1rem; border-radius: 100px; font-size: 0.8rem; font-weight: 600;
+    color: #a78bfa; margin-bottom: 1.5rem;
+    animation: fadeUp 0.6s ease both;
+  }
+  .hero-pill .dot { width: 6px; height: 6px; background: #10b981; border-radius: 50%; animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1}50%{opacity:0.4} }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)} }
+
+  h1 {
+    font-size: clamp(2.5rem, 6vw, 4.5rem); font-weight: 900; line-height: 1.1;
+    background: linear-gradient(135deg, #fff 30%, #a78bfa 70%, #60a5fa);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    margin-bottom: 1.5rem; animation: fadeUp 0.6s 0.1s ease both;
+  }
+  .hero p {
+    font-size: 1.15rem; color: var(--muted); max-width: 580px; line-height: 1.7;
+    animation: fadeUp 0.6s 0.2s ease both; margin-bottom: 2.5rem;
+  }
+  .hero-btns { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; animation: fadeUp 0.6s 0.3s ease both; }
+  .hero-stats {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
+    margin-top: 5rem; width: 100%; max-width: 700px;
+    animation: fadeUp 0.6s 0.4s ease both;
+  }
+  .stat { text-align: center; }
+  .stat-num { font-size: 2rem; font-weight: 900; background: linear-gradient(135deg, var(--accent), var(--blue)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+  .stat-label { font-size: 0.875rem; color: var(--muted); margin-top: 0.25rem; }
+
+  /* ── Glow blob ── */
+  .glow-blob {
+    position: absolute; border-radius: 50%; filter: blur(100px); pointer-events: none; z-index: 0;
+  }
+  .blob1 { width: 600px; height: 600px; background: rgba(124,58,237,0.12); top: -100px; left: 50%; transform: translateX(-50%); }
+  .blob2 { width: 400px; height: 400px; background: rgba(59,130,246,0.08); bottom: 0; right: 0; }
+
+  /* ── Section ── */
+  section { position: relative; z-index: 1; padding: 5rem 2rem; }
+  .container { max-width: 1100px; margin: 0 auto; }
+  .section-label { font-size: 0.8rem; font-weight: 700; color: var(--accent); letter-spacing: 0.12em; text-transform: uppercase; margin-bottom: 1rem; }
+  .section-title { font-size: clamp(1.75rem, 4vw, 2.5rem); font-weight: 800; margin-bottom: 1rem; }
+  .section-sub { color: var(--muted); max-width: 520px; line-height: 1.7; }
+
+  /* ── Feature grid ── */
+  .feature-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.25rem; margin-top: 3rem; }
+  .feature-card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 1.75rem; transition: all 0.3s;
+  }
+  .feature-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 0 30px rgba(124,58,237,0.1); }
+  .feat-icon { width: 44px; height: 44px; border-radius: 10px; background: rgba(124,58,237,0.15); border: 1px solid rgba(124,58,237,0.2); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; margin-bottom: 1rem; }
+  .feat-title { font-weight: 700; margin-bottom: 0.5rem; }
+  .feat-desc { font-size: 0.875rem; color: var(--muted); line-height: 1.6; }
+
+  /* ── Pricing ── */
+  .pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin-top: 3rem; }
+  .plan {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem;
+    position: relative; transition: all 0.3s;
+  }
+  .plan.popular {
+    border-color: var(--accent); box-shadow: 0 0 40px rgba(124,58,237,0.15);
+  }
+  .plan-badge { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, var(--accent), var(--blue)); padding: 0.25rem 1rem; border-radius: 100px; font-size: 0.75rem; font-weight: 700; white-space: nowrap; }
+  .plan-name { font-size: 1.1rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .plan-price { font-size: 2.5rem; font-weight: 900; margin-bottom: 0.25rem; }
+  .plan-price span { font-size: 1rem; font-weight: 400; color: var(--muted); }
+  .plan-sub { font-size: 0.8rem; color: var(--muted); margin-bottom: 1.5rem; }
+  .plan-features { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.75rem; }
+  .plan-features li { display: flex; align-items: center; gap: 0.6rem; font-size: 0.875rem; }
+  .plan-features li::before { content: '✓'; color: var(--success); font-weight: 700; }
+  .plan-features li.no::before { content: '✕'; color: var(--muted); }
+  .plan-features li.no { color: var(--muted); }
+
+  /* ── Code preview ── */
+  .code-block {
+    background: var(--card2); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; font-family: 'JetBrains Mono', monospace; font-size: 0.8rem;
+    line-height: 1.8; overflow-x: auto; margin-top: 2rem;
+  }
+  .code-block .co { color: #64748b; }
+  .code-block .kw { color: #a78bfa; }
+  .code-block .st { color: #34d399; }
+  .code-block .nu { color: #fb923c; }
+  .code-block .fn { color: #60a5fa; }
+
+  /* ── Dashboard preview ── */
+  .dash-preview {
+    background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+    overflow: hidden; margin-top: 3rem; box-shadow: 0 0 60px rgba(124,58,237,0.1);
+  }
+  .dash-top { background: var(--card2); border-bottom: 1px solid var(--border); padding: 1rem 1.5rem; display: flex; align-items: center; gap: 0.5rem; }
+  .dash-dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dash-body { display: grid; grid-template-columns: 200px 1fr; min-height: 340px; }
+  .dash-sidebar { border-right: 1px solid var(--border); padding: 1.5rem 1rem; }
+  .dash-nav-item { padding: 0.6rem 0.75rem; border-radius: 8px; font-size: 0.8rem; font-weight: 500; color: var(--muted); cursor: pointer; margin-bottom: 0.25rem; display: flex; align-items: center; gap: 0.5rem; }
+  .dash-nav-item.active { background: rgba(124,58,237,0.15); color: #a78bfa; }
+  .dash-main { padding: 1.5rem; }
+  .dash-stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+  .dash-stat { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 1rem; }
+  .dash-stat-val { font-size: 1.5rem; font-weight: 800; }
+  .dash-stat-lbl { font-size: 0.7rem; color: var(--muted); margin-top: 0.25rem; }
+  .dash-table { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .dash-th { display: grid; grid-template-columns: 1fr 1fr 1fr 80px; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.7rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .dash-tr { display: grid; grid-template-columns: 1fr 1fr 1fr 80px; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); font-size: 0.8rem; align-items: center; }
+  .dash-tr:last-child { border-bottom: none; }
+  .tag { padding: 0.2rem 0.6rem; border-radius: 100px; font-size: 0.7rem; font-weight: 600; }
+  .tag.active { background: rgba(16,185,129,0.15); color: #34d399; }
+  .tag.galactic { background: rgba(124,58,237,0.15); color: #a78bfa; }
+
+  /* ── CTA ── */
+  .cta-box {
+    background: linear-gradient(135deg, rgba(124,58,237,0.15), rgba(59,130,246,0.1));
+    border: 1px solid rgba(124,58,237,0.3); border-radius: 20px;
+    padding: 4rem 2rem; text-align: center; margin-top: 4rem;
+  }
+
+  /* ── Footer ── */
+  footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; color: var(--muted); font-size: 0.8rem; position: relative; z-index: 1; }
+
+  /* ── Modal ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.8); backdrop-filter: blur(4px); z-index: 200; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s; }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 2rem; width: 100%; max-width: 440px; transform: scale(0.95); transition: transform 0.2s; }
+  .modal-overlay.open .modal { transform: scale(1); }
+  .modal-title { font-size: 1.25rem; font-weight: 800; margin-bottom: 1.5rem; }
+  .form-group { margin-bottom: 1.25rem; }
+  label { font-size: 0.8rem; font-weight: 600; color: var(--muted); display: block; margin-bottom: 0.4rem; }
+  input,select { width: 100%; background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem 0.875rem; color: var(--text); font-size: 0.875rem; outline: none; transition: border-color 0.2s; font-family: inherit; }
+  input:focus,select:focus { border-color: var(--accent); }
+  .modal-close { position: absolute; top: 1rem; right: 1rem; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+
+<canvas id="particle-canvas"></canvas>
+<div class="glow-blob blob1"></div>
+<div class="glow-blob blob2"></div>
+
+<!-- Nav -->
+<nav>
+  <div class="nav-logo">
+    <div class="badge">0.6</div>
+    0.6xd Protection
+  </div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#how-it-works">How it Works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#docs">Docs</a>
+  </div>
+  <div class="nav-cta">
+    <a href="dashboard.html" class="btn btn-ghost">Dashboard</a>
+    <a href="#" class="btn btn-primary" onclick="openModal('signup')">Get Started →</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-pill">
+    <span class="dot"></span>
+    Galactic Protection V2 — Now Live
+  </div>
+  <h1>The Strongest<br>Lua Protection<br>on the Market</h1>
+  <p>Upload your script. Get an industrial-grade protected loader with key validation, anti-dump layers, VM obfuscation, and real-time key management.</p>
+  <div class="hero-btns">
+    <a href="dashboard.html" class="btn btn-primary btn-lg">🔒 Protect your script</a>
+    <a href="#how-it-works" class="btn btn-ghost btn-lg">See how it works</a>
+  </div>
+  <div class="hero-stats">
+    <div class="stat"><div class="stat-num" id="cnt-scripts">0</div><div class="stat-label">Scripts Protected</div></div>
+    <div class="stat"><div class="stat-num" id="cnt-keys">0</div><div class="stat-label">Keys Generated</div></div>
+    <div class="stat"><div class="stat-num" id="cnt-executions">0</div><div class="stat-label">Executions Blocked</div></div>
+  </div>
+</section>
+
+<!-- Features -->
+<section id="features">
+  <div class="container">
+    <p class="section-label">Protection Layers</p>
+    <h2 class="section-title">Built different.<br>Protected differently.</h2>
+    <p class="section-sub">Every script goes through 6 layers of transformation before leaving our servers.</p>
+    <div class="feature-grid">
+      <div class="feature-card">
+        <div class="feat-icon">🧬</div>
+        <div class="feat-title">String Table Encoding</div>
+        <div class="feat-desc">All string literals extracted, XOR-encoded with a random key per script, stored in an encrypted table only resolved at runtime.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon">🌀</div>
+        <div class="feat-title">VM Dispatch Layer</div>
+        <div class="feat-desc">Your code is compiled into a custom bytecode and executed through a Lua virtual machine. Decompilers see only the VM, never your logic.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon">🔑</div>
+        <div class="feat-title">Key Validation</div>
+        <div class="feat-desc">Scripts phone home to our API on every execute. Invalid, expired, or revoked keys are rejected within milliseconds.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon">🛡️</div>
+        <div class="feat-title">Anti-Tamper</div>
+        <div class="feat-desc">An integrity hash is baked into the loader. Any modification to the protected output causes it to silently halt.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon">👁️</div>
+        <div class="feat-title">Anti-Logger</div>
+        <div class="feat-desc">Hooks SimpleSpy, RemoteSpy, and 15+ known logger globals. Detection kicks the executor user instantly.</div>
+      </div>
+      <div class="feature-card">
+        <div class="feat-icon">♾️</div>
+        <div class="feat-title">Identifier Mangling</div>
+        <div class="feat-desc">Every variable, function, and local name is replaced with lookalike Unicode glyph identifiers that are visually indistinguishable.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section id="how-it-works" style="background: var(--bg2);">
+  <div class="container">
+    <p class="section-label">How it works</p>
+    <h2 class="section-title">From raw script<br>to protected loader</h2>
+    <div class="code-block">
+<span class="co">-- Your original script (example)</span>
+<span class="kw">local</span> Players = game:GetService(<span class="st">"Players"</span>)
+<span class="kw">local</span> lp = Players.LocalPlayer
+<span class="fn">doSomethingSensitive</span>(lp)
+
+<span class="co">-- ↓ 0.6xd Protection output (loader)</span>
+<span class="co">-- [[ 0.6xd Protection V2 | galactic ]]</span>
+<span class="kw">local</span> _key = <span class="st">"YOUR-KEY-HERE"</span>
+<span class="kw">local</span> _id  = <span class="st">"sc_a1b2c3d4"</span>
+<span class="kw">local</span> http = game:GetService(<span class="st">"HttpService"</span>)
+<span class="kw">local</span> ok   = http:GetAsync(<span class="st">"https://api.06xdprotect.com/v1/validate/"</span>.._id..<span class="st">"/"</span>.._key)
+<span class="kw">if</span> ok ~= <span class="st">"VALID"</span> <span class="kw">then</span> <span class="fn">error</span>(<span class="st">"Invalid key."</span>) <span class="kw">end</span>
+<span class="fn">loadstring</span>(http:GetAsync(<span class="st">"https://api.06xdprotect.com/v1/load/"</span>.._id..<span class="st">"/"</span>.._key))()
+    </div>
+  </div>
+</section>
+
+<!-- Dashboard preview -->
+<section>
+  <div class="container">
+    <p class="section-label">Dashboard</p>
+    <h2 class="section-title">Full control over<br>your scripts & keys</h2>
+    <div class="dash-preview">
+      <div class="dash-top">
+        <div class="dash-dot" style="background:#ef4444"></div>
+        <div class="dash-dot" style="background:#f59e0b"></div>
+        <div class="dash-dot" style="background:#10b981"></div>
+        <span style="margin-left:0.75rem;font-size:0.75rem;color:var(--muted)">dashboard.06xdprotect.com</span>
+      </div>
+      <div class="dash-body">
+        <div class="dash-sidebar">
+          <div style="font-size:0.7rem;font-weight:700;color:var(--muted);padding:0.5rem 0.75rem;margin-bottom:0.5rem">MENU</div>
+          <div class="dash-nav-item active">📊 Overview</div>
+          <div class="dash-nav-item">🔒 Scripts</div>
+          <div class="dash-nav-item">🔑 Keys</div>
+          <div class="dash-nav-item">📡 API</div>
+          <div class="dash-nav-item">⚙️ Settings</div>
+        </div>
+        <div class="dash-main">
+          <div class="dash-stat-row">
+            <div class="dash-stat"><div class="dash-stat-val">12</div><div class="dash-stat-lbl">Scripts</div></div>
+            <div class="dash-stat"><div class="dash-stat-val">847</div><div class="dash-stat-lbl">Active Keys</div></div>
+            <div class="dash-stat"><div class="dash-stat-val">23.4k</div><div class="dash-stat-lbl">Executions</div></div>
+          </div>
+          <div class="dash-table">
+            <div class="dash-th"><span>Script</span><span>Protection</span><span>Status</span><span>Keys</span></div>
+            <div class="dash-tr"><span>0.6xd_duels.lua</span><span><span class="tag galactic">Galactic V2</span></span><span><span class="tag active">Active</span></span><span>312</span></div>
+            <div class="dash-tr"><span>speed_mod.lua</span><span><span class="tag galactic">Galactic V2</span></span><span><span class="tag active">Active</span></span><span>89</span></div>
+            <div class="dash-tr"><span>anti_lag.lua</span><span><span class="tag galactic">Galactic V2</span></span><span><span class="tag active">Active</span></span><span>41</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Pricing -->
+<section id="pricing" style="background: var(--bg2);">
+  <div class="container">
+    <p class="section-label">Pricing</p>
+    <h2 class="section-title">Simple pricing.<br>No hidden costs.</h2>
+    <div class="pricing-grid">
+      <div class="plan">
+        <div class="plan-name">Free</div>
+        <div class="plan-price">$0<span>/mo</span></div>
+        <div class="plan-sub">Get started with basic protection</div>
+        <ul class="plan-features">
+          <li>3 scripts</li>
+          <li>50 keys per script</li>
+          <li>Standard obfuscation</li>
+          <li>Key expiry support</li>
+          <li class="no">VM layer</li>
+          <li class="no">Anti-logger</li>
+          <li class="no">Priority API</li>
+        </ul>
+        <a href="dashboard.html" class="btn btn-ghost" style="width:100%;justify-content:center">Get started</a>
+      </div>
+      <div class="plan popular">
+        <div class="plan-badge">Most Popular</div>
+        <div class="plan-name">Pro</div>
+        <div class="plan-price">$9<span>/mo</span></div>
+        <div class="plan-sub">For serious script developers</div>
+        <ul class="plan-features">
+          <li>Unlimited scripts</li>
+          <li>Unlimited keys</li>
+          <li>Galactic V2 obfuscation</li>
+          <li>VM dispatch layer</li>
+          <li>Anti-logger built-in</li>
+          <li>Key expiry + HWID lock</li>
+          <li>Priority API (sub-50ms)</li>
+        </ul>
+        <a href="#" class="btn btn-primary" style="width:100%;justify-content:center" onclick="openModal('signup')">Get Pro →</a>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Enterprise</div>
+        <div class="plan-price">$29<span>/mo</span></div>
+        <div class="plan-sub">White-label & custom integrations</div>
+        <ul class="plan-features">
+          <li>Everything in Pro</li>
+          <li>Custom domain loader</li>
+          <li>White-label dashboard</li>
+          <li>Discord bot integration</li>
+          <li>Custom VM key</li>
+          <li>Dedicated API node</li>
+          <li>SLA uptime guarantee</li>
+        </ul>
+        <a href="#" class="btn btn-ghost" style="width:100%;justify-content:center">Contact us</a>
+      </div>
+    </div>
+    <div class="cta-box">
+      <h2 style="font-size:2rem;font-weight:900;margin-bottom:0.75rem">Ready to protect your script?</h2>
+      <p style="color:var(--muted);margin-bottom:2rem">Join thousands of developers securing their Lua scripts with 0.6xd Protection.</p>
+      <a href="dashboard.html" class="btn btn-primary btn-lg">Open Dashboard →</a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>© 2025 0.6xd Protection · Built for developers who value their work</p>
+</footer>
+
+<!-- Signup Modal -->
+<div class="modal-overlay" id="modal-signup">
+  <div class="modal" style="position:relative">
+    <button class="modal-close" onclick="closeModal('signup')">✕</button>
+    <div class="modal-title">Create account</div>
+    <div class="form-group"><label>Username</label><input type="text" placeholder="yourname"></div>
+    <div class="form-group"><label>Email</label><input type="email" placeholder="you@example.com"></div>
+    <div class="form-group"><label>Password</label><input type="password" placeholder="••••••••"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="window.location.href='dashboard.html'">Create account →</button>
+  </div>
+</div>
+
+<script>
+// Particle canvas
+const cvs = document.getElementById('particle-canvas');
+const ctx = cvs.getContext('2d');
+let W, H, particles = [];
+function resize() { W = cvs.width = innerWidth; H = cvs.height = innerHeight; }
+resize(); window.addEventListener('resize', resize);
+for (let i = 0; i < 80; i++) particles.push({ x: Math.random()*W, y: Math.random()*H, r: Math.random()*1.5+0.5, vx: (Math.random()-0.5)*0.3, vy: (Math.random()-0.5)*0.3, a: Math.random() });
+function draw() {
+  ctx.clearRect(0,0,W,H);
+  for (const p of particles) {
+    p.x += p.vx; p.y += p.vy; p.a += 0.005;
+    if (p.x<0)p.x=W; if(p.x>W)p.x=0; if(p.y<0)p.y=H; if(p.y>H)p.y=0;
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle = `rgba(124,58,237,${0.15+Math.sin(p.a)*0.1})`; ctx.fill();
+  }
+  requestAnimationFrame(draw);
+}
+draw();
+
+// Counter animation
+function animCounter(el, target, suffix='') {
+  let start = 0; const dur = 2000; const step = target / (dur / 16);
+  const tick = () => { start = Math.min(start + step, target); el.textContent = Math.floor(start).toLocaleString() + suffix; if (start < target) requestAnimationFrame(tick); };
+  tick();
+}
+const io = new IntersectionObserver(entries => {
+  if (entries[0].isIntersecting) {
+    animCounter(document.getElementById('cnt-scripts'), 14820);
+    animCounter(document.getElementById('cnt-keys'), 392400);
+    animCounter(document.getElementById('cnt-executions'), 8910000);
+    io.disconnect();
+  }
+});
+io.observe(document.querySelector('.hero-stats'));
+
+// Modal
+function openModal(id) { document.getElementById('modal-'+id).classList.add('open'); }
+function closeModal(id) { document.getElementById('modal-'+id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); }));
+</script>
+</body>
+</html>
