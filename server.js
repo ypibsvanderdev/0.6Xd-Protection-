@@ -17,15 +17,55 @@ app.use(express.static(join(__dir, 'public')));
 // ── DB (flat JSON files) ─────────────────────────────────────────────────
 const DB_SCRIPTS = join(__dir, 'data', 'scripts.json');
 const DB_KEYS    = join(__dir, 'data', 'keys.json');
+const DB_STATS   = join(__dir, 'data', 'stats.json');
 
-function readDB(path) { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : {}; }
+function readDB(path, def={}) { return existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : def; }
 function writeDB(path, data) { writeFileSync(path, JSON.stringify(data, null, 2)); }
 
-let scripts = readDB(DB_SCRIPTS);
-let keys    = readDB(DB_KEYS);
+let scripts = readDB(DB_SCRIPTS, {});
+let keys    = readDB(DB_KEYS, {});
+let stats   = readDB(DB_STATS, { blocked: 0 });
 
 function saveScripts() { writeDB(DB_SCRIPTS, scripts); }
 function saveKeys()    { writeDB(DB_KEYS, keys); }
+function saveStats()   { writeDB(DB_STATS, stats); }
+function incBlocked()  { stats.blocked = (stats.blocked||0)+1; saveStats(); }
+
+// ── Denied Lua GUI (shown in Roblox when key is invalid) ──────────────────
+const DENIED_LUA = (reason='Invalid or expired key.') => `-- [[ 0.6xd Protection V2 | ACCESS DENIED ]]
+local _r="${reason.replace(/"/g,"'")}"
+pcall(function()
+  local sg=Instance.new("ScreenGui")
+  sg.Name="xd_denied" sg.ResetOnSpawn=false
+  local ok,_=pcall(function()sg.Parent=game:GetService("CoreGui")end)
+  if not ok then sg.Parent=game.Players.LocalPlayer.PlayerGui end
+  local bg=Instance.new("Frame",sg)
+  bg.Size=UDim2.new(0,440,0,190)
+  bg.Position=UDim2.new(0.5,-220,0.5,-95)
+  bg.BackgroundColor3=Color3.fromRGB(8,8,18)
+  bg.BorderSizePixel=0
+  Instance.new("UICorner",bg).CornerRadius=UDim.new(0,16)
+  local stroke=Instance.new("UIStroke",bg)
+  stroke.Color=Color3.fromRGB(124,58,237) stroke.Thickness=2
+  local t=Instance.new("TextLabel",bg)
+  t.Size=UDim2.new(1,0,0,50) t.Position=UDim2.new(0,0,0,18)
+  t.BackgroundTransparency=1 t.Text="\xF0\x9F\x94\x92  0.6xd Protection"
+  t.TextColor3=Color3.fromRGB(167,139,250) t.TextSize=20
+  t.Font=Enum.Font.GothamBold t.TextXAlignment=Enum.TextXAlignment.Center
+  local m=Instance.new("TextLabel",bg)
+  m.Size=UDim2.new(1,-40,0,50) m.Position=UDim2.new(0,20,0,72)
+  m.BackgroundTransparency=1 m.Text="ACCESS DENIED\n".._r
+  m.TextColor3=Color3.fromRGB(239,68,68) m.TextSize=14
+  m.Font=Enum.Font.Gotham m.TextWrapped=true
+  m.TextXAlignment=Enum.TextXAlignment.Center
+  local sub=Instance.new("TextLabel",bg)
+  sub.Size=UDim2.new(1,0,0,24) sub.Position=UDim2.new(0,0,0,145)
+  sub.BackgroundTransparency=1 sub.Text="Get a valid key at 06xdprotect.com"
+  sub.TextColor3=Color3.fromRGB(100,116,139) sub.TextSize=12
+  sub.Font=Enum.Font.Gotham sub.TextXAlignment=Enum.TextXAlignment.Center
+  task.delay(7,function()pcall(function()sg:Destroy()end)end)
+end)
+error("[0.6xd Protection] ".._r, 0)`;
 
 // ── Obfuscator ───────────────────────────────────────────────────────────
 function obfuscate(src) {
@@ -92,8 +132,9 @@ app.post('/v1/protect', upload.single('script'), (req, res) => {
     const name = req.body.name || req.file?.originalname?.replace(/\.lua$/, '') || 'script';
     const prot = req.body.protection || 'galactic';
     const id = genId();
-    const protected_src = obfuscate(src);
-    const script = { id, name, protection: prot === 'galactic' ? 'Galactic V2' : 'Standard', added: Date.now(), keyCount: 0, src: protected_src };
+    const protected_src = prot === 'none' ? src : obfuscate(src);
+    const protLabel = prot === 'galactic' ? 'Galactic V2' : prot === 'max' ? 'Max' : prot === 'none' ? 'None' : 'Standard';
+    const script = { id, name, protection: protLabel, added: Date.now(), keyCount: 0, src: protected_src };
     scripts[id] = script;
     saveScripts();
     res.json({ id, name, loader: makeLoader(script), message: 'Script protected successfully.' });
@@ -128,9 +169,9 @@ app.delete('/v1/scripts/:id', (req, res) => {
 app.get('/v1/validate/:scriptId/:key', (req, res) => {
     const { scriptId, key } = req.params;
     const k = keys[key];
-    if (!k) return res.type('text/plain').send('INVALID_KEY');
-    if (k.scriptId !== scriptId) return res.type('text/plain').send('WRONG_SCRIPT');
-    if (k.expires && Date.now() > k.expires) return res.type('text/plain').send('EXPIRED');
+    if (!k) { incBlocked(); return res.type('text/plain').send('INVALID_KEY'); }
+    if (k.scriptId !== scriptId) { incBlocked(); return res.type('text/plain').send('WRONG_SCRIPT'); }
+    if (k.expires && Date.now() > k.expires) { incBlocked(); return res.type('text/plain').send('EXPIRED'); }
     k.execs = (k.execs || 0) + 1;
     k.lastUsed = Date.now();
     saveKeys();
@@ -141,10 +182,13 @@ app.get('/v1/validate/:scriptId/:key', (req, res) => {
 app.get('/v1/load/:scriptId/:key', (req, res) => {
     const { scriptId, key } = req.params;
     const k = keys[key];
-    if (!k || k.scriptId !== scriptId) return res.status(403).type('text/plain').send('-- invalid key');
-    if (k.expires && Date.now() > k.expires) return res.status(403).type('text/plain').send('-- expired key');
+    if (!k || k.scriptId !== scriptId) { incBlocked(); return res.type('text/plain').send(DENIED_LUA('Invalid key.')); }
+    if (k.expires && Date.now() > k.expires) { incBlocked(); return res.type('text/plain').send(DENIED_LUA('Key expired.')); }
     const s = scripts[scriptId];
-    if (!s) return res.status(404).type('text/plain').send('-- script not found');
+    if (!s) return res.status(404).type('text/plain').send(DENIED_LUA('Script not found.'));
+    k.execs = (k.execs || 0) + 1; // count load as execution
+    k.lastUsed = Date.now();
+    saveKeys();
     res.type('text/plain').send(s.src);
 });
 
@@ -186,6 +230,7 @@ app.get('/v1/stats', (req, res) => {
         keys: allKeys.length,
         activeKeys: allKeys.filter(k => !k.expires || Date.now() < k.expires).length,
         totalExecutions: allKeys.reduce((a, k) => a + (k.execs||0), 0),
+        blocked: stats.blocked || 0,
     });
 });
 

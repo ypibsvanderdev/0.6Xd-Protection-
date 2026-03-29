@@ -312,6 +312,7 @@ local lp = Players.LocalPlayer
                   <div class="form-group" style="margin-bottom:0">
                     <label>Protection Level</label>
                     <select id="prot-level">
+                      <option value="none">None (no obfuscation)</option>
                       <option value="standard">Standard</option>
                       <option value="galactic" selected>Galactic V2 (Recommended)</option>
                       <option value="max">Max (Slower load)</option>
@@ -680,7 +681,6 @@ function handleDragOver(e) { e.preventDefault(); document.getElementById('upload
 
 // ── Protect script ─────────────────────────────────────────────────────────
 function protectScript() {
-  // get source from whichever tab is active
   const src = activeTab === 'paste'
     ? document.getElementById('paste-area').value.trim()
     : currentFileContent;
@@ -693,13 +693,15 @@ function protectScript() {
     || 'script';
   const prot = document.getElementById('prot-level').value;
   const id = genId();
-  const protected_src = obfuscateLua(src);
-  const script = { id, name, protection: prot === 'galactic' ? 'Galactic V2' : prot === 'max' ? 'Max' : 'Standard', added: Date.now(), keyCount: 0, src: protected_src };
+  const protected_src = prot === 'none' ? src : obfuscateLua(src);
+  const protLabel = prot === 'galactic' ? 'Galactic V2' : prot === 'max' ? 'Max' : prot === 'none' ? 'None' : 'Standard';
+  const script = { id, name, protection: protLabel, added: Date.now(), keyCount: 0, src: protected_src };
   SCRIPTS.unshift(script); save();
   const loader = makeLoader(script, '', 'minimal');
   document.getElementById('loader-code').textContent = loader;
   document.getElementById('result-card').style.display = 'block';
   notify('✅ Script protected!');
+  renderScripts();
 }
 function copyLoader() { navigator.clipboard.writeText(document.getElementById('loader-code').textContent); notify('Copied!'); }
 function downloadLoader() {
@@ -710,15 +712,19 @@ function downloadLoader() {
 
 // ── Overview ───────────────────────────────────────────────────────────────
 function animTo(el, val) {
-  let cur = 0; const step = val / 40;
+  let cur = 0; const step = Math.max(1, val / 40);
   const id = setInterval(() => { cur = Math.min(cur+step, val); el.textContent = Math.floor(cur).toLocaleString(); if (cur>=val) clearInterval(id); }, 20);
 }
-function renderOverview() {
-  const activeKeys = KEYS.filter(k => !k.expired && (!k.expires || Date.now() < k.expires));
-  animTo(document.getElementById('ov-scripts'), SCRIPTS.length);
-  animTo(document.getElementById('ov-keys'), activeKeys.length);
-  animTo(document.getElementById('ov-exec'), SCRIPTS.length * 234 + 812);
-  animTo(document.getElementById('ov-block'), Math.floor(Math.random()*30)+5);
+async function renderOverview() {
+  let serverStats = null;
+  try { const r = await fetch('/v1/stats'); if (r.ok) serverStats = await r.json(); } catch(_){}
+  const activeKeys = KEYS.filter(k => !k.expires || Date.now() < k.expires);
+  const localExec  = KEYS.reduce((s,k) => s+(k.execs||0), 0);
+  const localBlocked = parseInt(localStorage.getItem('06xd-blocked')||'0');
+  animTo(document.getElementById('ov-scripts'), serverStats?.scripts  ?? SCRIPTS.length);
+  animTo(document.getElementById('ov-keys'),    serverStats?.activeKeys ?? activeKeys.length);
+  animTo(document.getElementById('ov-exec'),    serverStats?.totalExecutions ?? localExec);
+  animTo(document.getElementById('ov-block'),   serverStats?.blocked ?? localBlocked);
   const stl = document.getElementById('ov-script-table');
   stl.innerHTML = SCRIPTS.slice(0,5).map(s => `<tr><td>${s.name}.lua</td><td><span class="tag tag-purple">${s.protection}</span></td><td>${s.keyCount}</td></tr>`).join('') || '<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:1.5rem">No scripts yet</td></tr>';
   const ktl = document.getElementById('ov-key-table');
@@ -799,15 +805,17 @@ function openGenKey() {
 function closeGenKey() { document.getElementById('gen-key-modal').classList.remove('open'); }
 function generateKey() {
   const scriptId = document.getElementById('gen-script-sel').value;
+  if (!scriptId) { notify('Select a script first', 'var(--danger)'); return; }
   const script = SCRIPTS.find(s=>s.id===scriptId);
+  if (!script) { notify('Script not found', 'var(--danger)'); return; }
   const expChoice = document.getElementById('gen-expiry').value;
   const note = document.getElementById('gen-note').value;
   const hwid = document.getElementById('gen-hwid').value;
   const expiresMap = { never:null, '1d':86400000, '7d':604800000, '30d':2592000000, '90d':7776000000, '1y':31536000000 };
   const exp = expiresMap[expChoice] ? Date.now() + expiresMap[expChoice] : null;
-  const key = { key: genKey(), scriptId, scriptName: script?.name||'—', expires: exp, hwid: hwid||null, note, execs: 0, created: Date.now() };
+  const key = { key: genKey(), scriptId, scriptName: script.name, expires: exp, hwid: hwid||null, note: note||null, execs: 0, created: Date.now() };
   KEYS.unshift(key);
-  if (script) { script.keyCount = (script.keyCount||0)+1; }
+  script.keyCount = (script.keyCount||0)+1;
   save();
   closeGenKey();
   renderKeys();
