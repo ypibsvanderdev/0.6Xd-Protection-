@@ -415,36 +415,27 @@ Response: { "key": "KEY-XXXX-XXXX-XXXX", "expires": "2025-12-31" }</div>
     <div class="page" id="page-loader">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;align-items:start">
         <div class="card">
-          <div class="card-header"><span class="card-title">Generate Loader</span></div>
+          <div class="card-header"><span class="card-title">Fetch Key Loader</span></div>
           <div class="card-body">
             <div class="form-group">
-              <label>Script</label>
-              <select id="loader-script-sel">
-                <option value="">Select a script...</option>
+              <label>Select Key</label>
+              <select id="loader-key-sel" onchange="updateLoaderPreview()">
+                <option value="">Select a key...</option>
               </select>
             </div>
-            <div class="form-group">
-              <label>Key (leave blank to let user input)</label>
-              <input type="text" id="loader-key" placeholder="KEY-XXXX-XXXX or blank">
+            <div id="loader-details" style="display:none;margin-top:1rem;font-size:0.75rem;color:var(--muted)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:0.4rem"><span>Script:</span><span id="dt-script" style="color:var(--text)">—</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Expiry:</span><span id="dt-expiry" style="color:var(--text)">—</span></div>
             </div>
-            <div class="form-group">
-              <label>Loader Style</label>
-              <select id="loader-style">
-                <option value="minimal">Minimal (clean)</option>
-                <option value="silent">Silent (no output)</option>
-                <option value="verbose">Verbose (status prints)</option>
-              </select>
-            </div>
-            <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="generateLoader()">Generate Loader</button>
+            <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:1.5rem" onclick="copyLoaderFromGen()">Copy Key Loader</button>
           </div>
         </div>
         <div class="card" id="loader-result-card" style="display:none">
           <div class="card-header">
-            <span class="card-title">Your Loader</span>
-            <button class="btn btn-ghost btn-sm" onclick="copyLoaderGen()">Copy</button>
+            <span class="card-title">Preview</span>
           </div>
           <div class="card-body">
-            <div class="code-block" style="margin:0"><pre id="loader-gen-code" style="white-space:pre-wrap;word-break:break-all"></pre></div>
+            <div class="code-block" style="margin:0"><pre id="loader-gen-code" style="white-space:pre-wrap;word-break:break-all;font-size:0.75rem"></pre></div>
           </div>
         </div>
       </div>
@@ -614,27 +605,9 @@ end
 loadstring(_D(_E))()`;
 }
 
-function makeLoader(script, key, style='minimal') {
-  const id = script.id;
-  const keyLine = key ? `local _key = "${key}"` : `local _key = "YOUR-KEY-HERE" -- replace with your key`;
-  if (style === 'verbose') return `-- [[ 0.6xd Protection Loader | ${script.name} ]]
-${keyLine}
-local _id = "${id}"
-local http = game:GetService("HttpService")
-print("[0.6xd] Validating key...")
-local ok = http:GetAsync("https://api.06xdprotect.com/v1/validate/${id}/".._key)
-if ok ~= "VALID" then error("[0.6xd] Invalid or expired key.") end
-print("[0.6xd] Key valid. Loading script...")
-loadstring(http:GetAsync("https://api.06xdprotect.com/v1/load/${id}/".._key))()
-print("[0.6xd] Loaded.")`;
-  if (style === 'silent') return `${keyLine}
-loadstring(game:HttpGet("https://api.06xdprotect.com/v1/load/${id}/".._key))()`;
-  return `-- [[ 0.6xd Protection | ${script.name} ]]
-${keyLine}
-local _id = "${id}"
-local http = game:GetService("HttpService")
-assert(http:GetAsync("https://api.06xdprotect.com/v1/validate/".._id.."/".._key)=="VALID","[0.6xd] Invalid key.")
-loadstring(http:GetAsync("https://api.06xdprotect.com/v1/load/".._id.."/".._key))()`;
+// ── Loader Logic ──────────────────────────────────────────────────────────
+function makeLoader(loaderHash) {
+  return `loadstring(game:HttpGet("${window.location.origin}/files/v4/loaders/${loaderHash}.lua"))()`;
 }
 
 // ── File handling ──────────────────────────────────────────────────────────
@@ -767,8 +740,8 @@ function showUpload() { document.getElementById('scripts-list-view').style.displ
 function hideUpload() { document.getElementById('scripts-upload-view').style.display='none'; document.getElementById('scripts-list-view').style.display='block'; document.getElementById('result-card').style.display='none'; }
 function deleteScript(id) { SCRIPTS = SCRIPTS.filter(s=>s.id!==id); save(); renderScripts(); notify('Script deleted','var(--danger)'); }
 function copyScriptLoader(id) {
-  const s = SCRIPTS.find(x=>x.id===id); if(!s) return;
-  navigator.clipboard.writeText(makeLoader(s,'','minimal')); notify('Loader copied!');
+  // Scripts don't have a loader hash — show message to generate a key first
+  notify('Generate a key first to get a loader URL', 'var(--warn)');
 }
 
 // ── Keys ───────────────────────────────────────────────────────────────────
@@ -778,24 +751,30 @@ function renderKeys(filter='') {
   const tbody = document.getElementById('keys-table');
   tbody.innerHTML = keysToShow.map(k => {
     const expired = k.expires && Date.now() > k.expires;
+    const loaderLine = k.loader || `loadstring(game:HttpGet("http://localhost:3567/files/v4/loaders/${k.loaderHash}.lua"))()`;
     return `<tr>
-      <td style="font-family:JetBrains Mono,monospace;font-size:0.72rem">${k.key}</td>
+      <td style="font-family:JetBrains Mono,monospace;font-size:0.7rem">${k.key}</td>
       <td>${k.scriptName||'—'}</td>
       <td>${fmtExpiry(k.expires)}</td>
-      <td style="font-size:0.72rem;color:var(--muted)">${k.hwid||'—'}</td>
       <td>${k.execs||0}</td>
       <td>${expired ? '<span class="tag tag-red">Expired</span>' : '<span class="tag tag-green">Active</span>'}</td>
       <td>
         <div style="display:flex;gap:0.4rem">
-          <button class="btn btn-ghost btn-sm" onclick="copyKey('${k.key}')">Copy</button>
+          <button class="btn btn-primary btn-sm" onclick="copyKeyLoader('${k.key}')">Copy Loader</button>
           <button class="btn btn-danger btn-sm" onclick="revokeKey('${k.key}')">Revoke</button>
         </div>
       </td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:2rem">No keys yet.</td></tr>';
+  }).join('') || '<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:2rem">No keys yet.</td></tr>';
 }
 function filterKeys(v) { renderKeys(v); }
 function copyKey(k) { navigator.clipboard.writeText(k); notify('Key copied!'); }
+function copyKeyLoader(k) {
+  const key = KEYS.find(x=>x.key===k); if(!key) return;
+  const loader = key.loader || `loadstring(game:HttpGet("http://localhost:3567/files/v4/loaders/${key.loaderHash}.lua"))()`;
+  navigator.clipboard.writeText(loader);
+  notify('✅ Loader copied!');
+}
 function revokeKey(k) { KEYS = KEYS.filter(x=>x.key!==k); save(); renderKeys(); notify('Key revoked','var(--danger)'); }
 function openGenKey() {
   const sel = document.getElementById('gen-script-sel');
@@ -813,31 +792,49 @@ function generateKey() {
   const hwid = document.getElementById('gen-hwid').value;
   const expiresMap = { never:null, '1d':86400000, '7d':604800000, '30d':2592000000, '90d':7776000000, '1y':31536000000 };
   const exp = expiresMap[expChoice] ? Date.now() + expiresMap[expChoice] : null;
-  const key = { key: genKey(), scriptId, scriptName: script.name, expires: exp, hwid: hwid||null, note: note||null, execs: 0, created: Date.now() };
+  const loaderHash = [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
+  const loaderUrl  = `http://localhost:3567/files/v4/loaders/${loaderHash}.lua`;
+  const loader     = `loadstring(game:HttpGet("${loaderUrl}"))()`;
+  const key = { key: genKey(), loaderHash, loaderUrl, loader, scriptId, scriptName: script.name, expires: exp, hwid: hwid||null, note: note||null, execs: 0, created: Date.now() };
   KEYS.unshift(key);
   script.keyCount = (script.keyCount||0)+1;
   save();
   closeGenKey();
   renderKeys();
-  notify('🔑 Key generated: ' + key.key);
+  // Show the loader string immediately
+  notify('🔑 Loader ready — click Copy Loader on the key');
+  navigator.clipboard.writeText(loader);
 }
 
 // ── Loader page ────────────────────────────────────────────────────────────
 function renderLoaderDropdown() {
-  const sel = document.getElementById('loader-script-sel');
-  sel.innerHTML = '<option value="">Select a script...</option>' + SCRIPTS.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+  const sel = document.getElementById('loader-key-sel');
+  sel.innerHTML = '<option value="">Select a key...</option>' + KEYS.map(k=>`<option value="${k.key}">${k.key} (${k.scriptName})</option>`).join('');
 }
-function generateLoader() {
-  const id = document.getElementById('loader-script-sel').value;
-  const script = SCRIPTS.find(s=>s.id===id);
-  if (!script) { notify('Select a script first','var(--danger)'); return; }
-  const key = document.getElementById('loader-key').value;
-  const style = document.getElementById('loader-style').value;
-  const code = makeLoader(script, key, style);
+function updateLoaderPreview() {
+  const kStr = document.getElementById('loader-key-sel').value;
+  const k = KEYS.find(x=>x.key===kStr);
+  if (!k) {
+    document.getElementById('loader-details').style.display = 'none';
+    document.getElementById('loader-result-card').style.display = 'none';
+    return;
+  }
+  document.getElementById('dt-script').textContent = k.scriptName;
+  document.getElementById('dt-expiry').textContent = k.expires ? new Date(k.expires).toLocaleDateString() : 'Never';
+  document.getElementById('loader-details').style.display = 'block';
+  
+  const code = k.loader || makeLoader(k.loaderHash);
   document.getElementById('loader-gen-code').textContent = code;
   document.getElementById('loader-result-card').style.display = 'block';
 }
-function copyLoaderGen() { navigator.clipboard.writeText(document.getElementById('loader-gen-code').textContent); notify('Loader copied!'); }
+function copyLoaderFromGen() {
+  const kStr = document.getElementById('loader-key-sel').value;
+  if (!kStr) { notify('Select a key first','var(--danger)'); return; }
+  const k = KEYS.find(x=>x.key===kStr);
+  const code = k.loader || makeLoader(k.loaderHash);
+  navigator.clipboard.writeText(code);
+  notify('✅ Loader copied!');
+}
 
 // ── API page ───────────────────────────────────────────────────────────────
 function toggleApiKey() { const i=document.getElementById('api-key-input'); i.type=i.type==='password'?'text':'password'; }

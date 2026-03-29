@@ -2,6 +2,7 @@ import express from 'express';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { randomBytes } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
 
@@ -112,16 +113,13 @@ end
 loadstring(_D(_E))()`;
 }
 
-function makeLoader(script, key='YOUR-KEY-HERE', style='minimal') {
-    const id = script.id;
-    const keyLine = `local _key = "${key}"`;
-    if (style === 'verbose') return `-- [[ 0.6xd Protection Loader | ${script.name} ]]\n${keyLine}\nlocal _id = "${id}"\nlocal http = game:GetService("HttpService")\nprint("[0.6xd] Validating key...")\nlocal ok = http:GetAsync("http://localhost:${PORT}/v1/validate/".._id.."/".._key)\nif ok ~= "VALID" then error("[0.6xd] Invalid or expired key.") end\nprint("[0.6xd] Key valid. Loading...")\nloadstring(http:GetAsync("http://localhost:${PORT}/v1/load/".._id.."/".._key))()\nprint("[0.6xd] Done.")`;
-    if (style === 'silent') return `${keyLine}\nloadstring(game:HttpGet("http://localhost:${PORT}/v1/load/${id}/".._key))()`;
-    return `-- [[ 0.6xd Protection | ${script.name} ]]\n${keyLine}\nlocal _id = "${id}"\nlocal http = game:GetService("HttpService")\nassert(http:GetAsync("http://localhost:${PORT}/v1/validate/".._id.."/".._key)=="VALID","[0.6xd] Invalid key.")\nloadstring(http:GetAsync("http://localhost:${PORT}/v1/load/".._id.."/".._key))()`;
+function makeLoader(host, loaderHash) {
+    return `loadstring(game:HttpGet("http://${host}/files/v4/loaders/${loaderHash}.lua"))()`;
 }
 
 function genId()  { return 'sc_' + Math.random().toString(36).slice(2, 10); }
 function genKey() { const seg = () => Math.random().toString(36).toUpperCase().slice(2,6).padEnd(4,'X'); return `KEY-${seg()}-${seg()}-${seg()}`; }
+function genHash() { return randomBytes(16).toString('hex'); }
 
 // ── API Routes ───────────────────────────────────────────────────────────
 
@@ -137,7 +135,7 @@ app.post('/v1/protect', upload.single('script'), (req, res) => {
     const script = { id, name, protection: protLabel, added: Date.now(), keyCount: 0, src: protected_src };
     scripts[id] = script;
     saveScripts();
-    res.json({ id, name, loader: makeLoader(script), message: 'Script protected successfully.' });
+    res.json({ id, name, loader: makeLoader(req.headers.host, id), message: 'Script protected successfully.' });
 });
 
 // Get all scripts
@@ -163,6 +161,21 @@ app.delete('/v1/scripts/:id', (req, res) => {
     Object.keys(keys).forEach(k => { if (keys[k].scriptId === req.params.id) delete keys[k]; });
     saveKeys();
     res.json({ ok: true });
+});
+
+// ── Luarmor-style loader endpoint: /files/v4/loaders/:hash.lua ───────────
+app.get('/files/v4/loaders/:hash', (req, res) => {
+    const hash = req.params.hash.replace(/\.lua$/, '');
+    // Find key by loaderHash
+    const k = Object.values(keys).find(k => k.loaderHash === hash);
+    if (!k) { incBlocked(); return res.type('text/plain').send(DENIED_LUA('Invalid loader URL.')); }
+    if (k.expires && Date.now() > k.expires) { incBlocked(); return res.type('text/plain').send(DENIED_LUA('Key expired.')); }
+    const s = scripts[k.scriptId];
+    if (!s) { incBlocked(); return res.type('text/plain').send(DENIED_LUA('Script not found.')); }
+    k.execs = (k.execs || 0) + 1;
+    k.lastUsed = Date.now();
+    saveKeys();
+    res.type('text/plain').send(s.src);
 });
 
 // Validate a key
@@ -197,11 +210,14 @@ app.post('/v1/keys/generate', (req, res) => {
     const { scriptId, expiresIn, note, hwid } = req.body;
     if (!scripts[scriptId]) return res.status(404).json({ error: 'Script not found' });
     const key = genKey();
+    const loaderHash = genHash();
     const expires = expiresIn ? Date.now() + expiresIn * 1000 : null;
-    keys[key] = { key, scriptId, scriptName: scripts[scriptId].name, expires, note: note||null, hwid: hwid||null, execs: 0, created: Date.now() };
+    const loaderUrl = `${HOST}/files/v4/loaders/${loaderHash}.lua`;
+    const loader = `loadstring(game:HttpGet("${loaderUrl}"))()`;
+    keys[key] = { key, loaderHash, loaderUrl, loader, scriptId, scriptName: scripts[scriptId].name, expires, note: note||null, hwid: hwid||null, execs: 0, created: Date.now() };
     scripts[scriptId].keyCount = (scripts[scriptId].keyCount||0) + 1;
     saveKeys(); saveScripts();
-    res.json({ key, expires, scriptId, message: 'Key generated.' });
+    res.json({ key, loaderHash, loaderUrl, loader, expires, scriptId, message: 'Key generated.' });
 });
 
 // List keys
