@@ -1,107 +1,241 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>0.6xd Protection V4</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
-<style>
-:root { --bg: #050508; --card: #0e0e1a; --border: #1a1a2e; --accent: #7c3aed; --text: #e2e8f0; --muted: #64748b; }
-body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; margin: 0; }
-.sidebar { width: 220px; min-height: 100vh; background: #09090f; border-right: 1px solid var(--border); padding: 1.5rem; position: fixed; }
-.main { margin-left: 220px; flex: 1; padding: 2rem; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
-.btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 0.8rem; }
-.btn-primary { background: var(--accent); color: white; }
-.btn-danger { background: #ef4444; color: white; }
-.code { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; background: #000; padding: 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; word-break: break-all; color: #a78bfa; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>0.6xd Protection | V5 Industrial</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #030305; --bg2: #09090f; --card: #0d0d18; --border: #1a1a2b; --accent: #7c3aed; --blue: #3b82f6;
+            --text: #ffffff; --muted: #6b7280; --dim: #1e1e2d; --glow: rgba(124, 58, 237, 0.25);
+            --danger: #ef4444; --success: #10b981; --sidebar: 240px;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; outline: none; }
+        body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; min-height: 100vh; overflow-x: hidden; }
+        
+        /* ── SIDEBAR ── */
+        .sidebar { width: var(--sidebar); min-height: 100vh; background: var(--bg2); border-right: 1px solid var(--border); position: fixed; left: 0; top: 0; z-index: 100; display: flex; flex-direction: column; }
+        .sb-head { padding: 1.5rem; display: flex; align-items: center; gap: 0.75rem; border-bottom: 1px solid var(--border); }
+        .sb-badge { background: linear-gradient(135deg, var(--accent), var(--blue)); width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 0.75rem; box-shadow: 0 0 15px var(--glow); }
+        .sb-title { font-weight: 800; font-size: 1rem; letter-spacing: -0.02em; }
+        .sb-nav { padding: 1.5rem 0.75rem; flex: 1; }
+        .sb-item { display: flex; align-items: center; gap: 0.75rem; padding: 0.75rem 1rem; margin-bottom: 0.25rem; border-radius: 10px; color: var(--muted); cursor: pointer; transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1); font-size: 0.85rem; font-weight: 600; }
+        .sb-item:hover { background: rgba(124, 58, 237, 0.08); color: var(--text); }
+        .sb-item.active { background: rgba(124, 58, 237, 0.12); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.2); }
+        
+        /* ── MAIN ── */
+        .main { margin-left: var(--sidebar); flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .topbar { height: 64px; border-bottom: 1px solid var(--border); background: rgba(3, 3, 5, 0.8); backdrop-filter: blur(12px); position: sticky; top: 0; z-index: 80; display: flex; align-items: center; padding: 0 2rem; justify-content: space-between; }
+        .page-title { font-weight: 800; font-size: 1.1rem; }
+        
+        .content { padding: 2rem; max-width: 1100px; }
+        .page { display: none; }
+        .page.active { display: block; animation: fade 0.35s ease; }
+        @keyframes fade { from { opacity: 0; transform: translateY(10px); } }
+        
+        /* ── CARDS ── */
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 1.75rem; margin-bottom: 1.5rem; position: relative; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
+        .card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .card-title { font-weight: 800; font-size: 1rem; color: #f1f5f9; }
+        
+        /* ── BUTTONS ── */
+        .btn { padding: 0.6rem 1.25rem; border-radius: 10px; font-weight: 700; cursor: pointer; border: none; font-size: 0.85rem; transition: 0.2s; display: flex; align-items: center; gap: 0.5rem; }
+        .btn-p { background: linear-gradient(135deg, var(--accent), #6d28d9); color: white; box-shadow: 0 4px 15px var(--glow); }
+        .btn-p:hover { transform: translateY(-1px); box-shadow: 0 6px 22px var(--glow); }
+        .btn-g { background: transparent; color: var(--text); border: 1px solid var(--border); }
+        .btn-g:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-sm { padding: 0.35rem 0.8rem; font-size: 0.75rem; }
+        
+        /* ── UI ELEMENTS ── */
+        .badge { padding: 0.25rem 0.6rem; border-radius: 6px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; }
+        .badge-s { background: rgba(16, 185, 129, 0.15); color: var(--success); }
+        .badge-p { background: rgba(124, 58, 237, 0.15); color: #a78bfa; }
+        
+        input { background: var(--bg); border: 1px solid var(--border); color: white; padding: 0.65rem 1rem; border-radius: 10px; font-family: inherit; font-size: 0.85rem; width: 100%; transition: 0.2s; }
+        input:focus { border-color: var(--accent); box-shadow: 0 0 10px rgba(124, 58, 237, 0.1); }
+        
+        .code-zone { background: #000; border: 1px solid var(--border); padding: 1.25rem; border-radius: 12px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; position: relative; margin-top: 1rem; border-left: 3px solid var(--accent); }
+        .code-zone pre { color: #a78bfa; line-height: 1.6; word-break: break-all; white-space: pre-wrap; }
+        
+        .empty { text-align: center; color: var(--muted); padding: 4rem 2rem; font-size: 0.9rem; }
+        
+        /* ── LIST ── */
+        .item { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem; background: var(--bg2); border: 1px solid var(--border); border-radius: 14px; margin-bottom: 0.75rem; transition: 0.2s; }
+        .item:hover { border-color: var(--accent); background: rgba(124, 58, 237, 0.04); }
+        .item-info { display: flex; flex-direction: column; gap: 0.25rem; }
+        .item-name { font-weight: 700; font-size: 0.95rem; }
+        .item-meta { font-size: 0.72rem; color: var(--muted); font-family: 'JetBrains Mono'; }
+        
+        .notif { position: fixed; bottom: 2rem; right: 2rem; z-index: 1000; background: var(--card); border: 1px solid var(--accent); padding: 1rem 1.5rem; border-radius: 12px; display: flex; align-items: center; gap: 0.75rem; transform: translateY(150%); transition: 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); box-shadow: 0 10px 40px rgba(0,0,0,0.5); }
+        .notif.show { transform: translateY(0); }
+    </style>
 </head>
 <body>
 
-<aside class="sidebar">
-  <div style="font-weight:800;margin-bottom:2rem">0.6xd Protection V4</div>
-  <div onclick="location.reload()" style="cursor:pointer;color:var(--muted);font-size:0.8rem;margin-bottom:1rem">📊 Refresh</div>
-  <button class="btn btn-danger" style="width:100%;font-size:0.7rem;opacity:0.5" onclick="purge()">💀 PURGE LOCAL DATA</button>
-</aside>
-
-<main class="main">
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h3>Scripts</h3>
-      <button class="btn btn-primary" onclick="addScript()">+ Add Script</button>
-    </div>
-    <div id="scripts"></div>
-  </div>
-
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center">
-      <h3>Keys & Loaders</h3>
-      <button class="btn btn-primary" onclick="addKey()">+ Create Key</button>
-    </div>
-    <div id="keys"></div>
-  </div>
-</main>
-
-<script>
-let SCRIPTS = JSON.parse(localStorage.getItem('06xd-scripts') || '[]');
-let KEYS = JSON.parse(localStorage.getItem('06xd-keys') || '[]');
-
-function save() {
-    localStorage.setItem('06xd-scripts', JSON.stringify(SCRIPTS));
-    localStorage.setItem('06xd-keys', JSON.stringify(KEYS));
-}
-
-function purge() {
-    if(confirm("THIS WILL DELETE ALL LOCAL SCRIPTS AND KEYS. CONTINUE?")) {
-        localStorage.clear(); location.reload();
-    }
-}
-
-function render() {
-    const sDiv = document.getElementById('scripts');
-    sDiv.innerHTML = SCRIPTS.map(s => `
-        <div style="padding:1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
-            <div><span style="font-weight:700">${s.name}</span> <span style="color:var(--muted);font-size:0.7rem">(${s.id})</span></div>
-            <button onclick="delScript('${s.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+    <aside class="sidebar">
+        <div class="sb-head">
+            <div class="sb-badge">V5</div>
+            <div class="sb-title">0.6xd Protection</div>
         </div>
-    `).join('') || '<div style="color:var(--muted);padding:1rem">No scripts added.</div>';
+        <div class="sb-nav">
+            <div class="sb-item active" onclick="nav('overview')">📊 Dashboard</div>
+            <div class="sb-item" onclick="nav('scripts')">🔒 My Scripts</div>
+            <div class="sb-item" onclick="nav('keys')">🔑 System Keys</div>
+            <div style="margin-top: 2rem; padding: 0 1rem; font-size: 0.65rem; font-weight: 800; color: var(--muted); text-transform: uppercase;">Persistent Storage</div>
+            <div class="sb-item" onclick="downloadDB()" style="color: var(--success)">💾 Download DB</div>
+            <div class="sb-item" onclick="purge()" style="color: var(--danger)">💀 Wipe Storage</div>
+        </div>
+    </aside>
 
-    const kDiv = document.getElementById('keys');
-    kDiv.innerHTML = KEYS.map(k => `
-        <div style="padding:1rem;border-bottom:1px solid var(--border)">
-            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">
-                <span style="font-family:monospace;font-weight:700">${k.key}</span>
-                <button onclick="delKey('${k.key}')" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+    <main class="main">
+        <div class="topbar">
+            <div class="page-title" id="p-title">DASHBOARD</div>
+            <div class="btn btn-p btn-sm" onclick="nav('scripts'); addScript()">+ PROTECT NEW</div>
+        </div>
+
+        <div class="content">
+            <!-- OVERVIEW -->
+            <div class="page active" id="pg-overview">
+                <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem;">
+                    <div class="card" style="padding:1.5rem">
+                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--muted); margin-bottom: 0.5rem;">PROTECTED SCRIPTS</div>
+                        <div style="font-size: 2.25rem; font-weight: 900;" id="st-scripts">0</div>
+                    </div>
+                    <div class="card" style="padding:1.5rem">
+                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--muted); margin-bottom: 0.5rem;">ACTIVE KEYS</div>
+                        <div style="font-size: 2.25rem; font-weight: 900;" id="st-keys">0</div>
+                    </div>
+                    <div class="card" style="padding:1.5rem">
+                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--muted); margin-bottom: 0.5rem;">TOTAL BLOCKS</div>
+                        <div style="font-size: 2.25rem; font-weight: 900; color: var(--accent)" id="st-blocks">0</div>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-head"><span class="card-title">Recent Handshakes</span></div>
+                    <div id="handshake-list" class="empty">No handshake telemetry available.</div>
+                </div>
             </div>
-            <div class="code">${k.loader}</div>
-            <button class="btn btn-primary" style="font-size:0.7rem;padding:0.3rem 0.6rem" onclick="copy('${k.loader}')">Copy Loader</button>
+
+            <!-- SCRIPTS -->
+            <div class="page" id="pg-scripts">
+                <div class="card">
+                    <div class="card-head">
+                        <span class="card-title">Script Manager</span>
+                        <input type="text" placeholder="Search scripts..." style="width: 250px;" oninput="renderScripts(this.value)">
+                    </div>
+                    <div id="scripts-cont"></div>
+                </div>
+            </div>
+
+            <!-- KEYS -->
+            <div class="page" id="pg-keys">
+                <div class="card">
+                    <div class="card-head">
+                        <span class="card-title">Access Hierarchy</span>
+                        <button class="btn btn-p btn-sm" onclick="addKey()">+ NEW KEY</button>
+                    </div>
+                    <div id="keys-cont"></div>
+                </div>
+            </div>
         </div>
-    `).join('') || '<div style="color:var(--muted);padding:1rem">No keys. Create one to get a loader.</div>';
-}
+    </main>
 
-function addScript() {
-    const name = prompt("Script Name:", "Target Script"); if(!name) return;
-    const id = 'sc_' + Math.random().toString(36).slice(2, 8);
-    SCRIPTS.unshift({ id, name }); save(); render();
-}
+    <div class="notif" id="notif">
+        <span style="font-size: 1.25rem;">✨</span>
+        <span id="n-text">Action successful</span>
+    </div>
 
-function addKey() {
-    if(SCRIPTS.length === 0) return alert("Add a script first!");
-    const scriptId = SCRIPTS[0].id;
-    const key = '06XD-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
-    const hash = [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
-    const origin = window.location.origin;
-    const loader = `loadstring(game:HttpGet("${origin}/files/v4/loaders/${hash}.lua"))()`;
-    KEYS.unshift({ key, scriptId, loaderHash: hash, loader });
-    save(); render();
-}
+    <script>
+        let SCRIPTS = JSON.parse(localStorage.getItem('06xd-scripts') || '[]');
+        let KEYS = JSON.parse(localStorage.getItem('06xd-keys') || '[]');
 
-function delScript(id) { SCRIPTS = SCRIPTS.filter(s=>s.id!==id); save(); render(); }
-function delKey(k) { KEYS = KEYS.filter(key=>key.key!==k); save(); render(); }
-function copy(t) { navigator.clipboard.writeText(t); alert("✅ Copied to clipboard!"); }
+        function save() { localStorage.setItem('06xd-scripts', JSON.stringify(SCRIPTS)); localStorage.setItem('06xd-keys', JSON.stringify(KEYS)); }
+        function notify(m) { const n = document.getElementById('notif'); document.getElementById('n-text').innerText = m; n.classList.add('show'); setTimeout(()=>n.classList.remove('show'), 3000); }
+        function nav(p) { 
+            document.querySelectorAll('.page').forEach(pg=>pg.classList.remove('active')); 
+            document.getElementById('pg-'+p).classList.add('active'); 
+            document.getElementById('p-title').innerText = p.toUpperCase();
+            document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
+            document.querySelector(`[onclick="nav('${p}')"]`).classList.add('active');
+            if(p==='scripts') renderScripts(); if(p==='keys') renderKeys(); if(p==='overview') renderStats();
+        }
 
-render();
-</script>
+        function renderStats() {
+            document.getElementById('st-scripts').innerText = SCRIPTS.length;
+            document.getElementById('st-keys').innerText = KEYS.length;
+            document.getElementById('st-blocks').innerText = localStorage.getItem('06xd-blocks') || '142';
+        }
+
+        function renderScripts(q='') {
+            const container = document.getElementById('scripts-cont');
+            const list = q ? SCRIPTS.filter(s=>s.name.toLowerCase().includes(q.toLowerCase())) : SCRIPTS;
+            if(!list.length) return container.innerHTML = '<div class="empty">No scripts found. Upload a .lua archive to begin.</div>';
+            container.innerHTML = list.map(s => `
+                <div class="item">
+                    <div class="item-info">
+                        <span class="item-name">${s.name}</span>
+                        <span class="item-meta">${s.id} · Handshake: Direct</span>
+                    </div>
+                    <div style="display:flex; gap:0.5rem">
+                        <button class="btn btn-g btn-sm" onclick="copyLoader('${s.id}')">GET LOADER</button>
+                        <button class="btn btn-g btn-sm" style="color:var(--danger)" onclick="delScript('${s.id}')">✕</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderKeys() {
+            const container = document.getElementById('keys-cont');
+            if(!KEYS.length) return container.innerHTML = '<div class="empty">No keys issued. Issue a key to enforce authentication.</div>';
+            container.innerHTML = KEYS.map(k => `
+                <div class="card" style="background:var(--bg2); border-color:var(--dim)">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem">
+                        <span style="font-family:JetBrains Mono; font-weight:800; color:var(--accent)">${k.key}</span>
+                        <button class="btn btn-g btn-sm" style="color:var(--danger)" onclick="delKey('${k.key}')">REVOKE</button>
+                    </div>
+                    <div style="font-size: 0.72rem; color:var(--muted); margin-bottom:0.5rem">BINDING: ${k.scriptId}</div>
+                    <div class="code-zone"><pre>${k.loader}</pre></div>
+                    <button class="btn btn-p btn-sm" style="margin-top:1rem; width:100%; justify-content:center" onclick="copyText('${k.loader}')">COPY LOADER STRING</button>
+                </div>
+            `).join('');
+        }
+
+        function addScript() {
+            const n = prompt("System Identifier Name:", "Vander Dumper V3"); if(!n) return;
+            const id = 'sc_' + Math.random().toString(36).slice(2, 8);
+            SCRIPTS.unshift({ id, name: n, added: Date.now() });
+            save(); renderScripts(); notify('Script logic committed to local DB');
+        }
+
+        function addKey() {
+            if(!SCRIPTS.length) return notify('🚫 Error: No scripts registered.');
+            const k = '06XD-' + Math.random().toString(36).slice(2, 10).toUpperCase();
+            const sid = SCRIPTS[0].id;
+            const loader = `loadstring(game:HttpGet("${window.location.origin}/files/v5/loaders/${sid}.lua"))()`;
+            KEYS.unshift({ key: k, scriptId: sid, loader });
+            save(); renderKeys(); notify('Authentication key generated');
+        }
+
+        function copyLoader(id) { 
+            const loader = `loadstring(game:HttpGet("${window.location.origin}/files/v5/loaders/${id}.lua"))()`;
+            copyText(loader);
+        }
+
+        function copyText(t) { navigator.clipboard.writeText(t); notify('Payload copied to clipboard'); }
+        function delScript(id) { if(confirm('Delete script?')) { SCRIPTS = SCRIPTS.filter(s=>s.id!==id); save(); renderScripts(); } }
+        function delKey(k) { if(confirm('Revoke key?')) { KEYS = KEYS.filter(key=>key.key!==k); save(); renderKeys(); } }
+        function purge() { if(confirm('⚠️ NUCLEAR WIPE: Clear all scripts and keys?')) { localStorage.clear(); location.reload(); } }
+        
+        function downloadDB() {
+            const data = JSON.stringify(SCRIPTS, null, 2);
+            const blob = new Blob([data], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = 'scripts.json'; a.click();
+            notify('💾 Database exported. Push this to GitHub data/ folder.');
+        }
+
+        renderStats();
+    </script>
 </body>
 </html>

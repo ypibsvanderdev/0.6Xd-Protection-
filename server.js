@@ -1,8 +1,8 @@
 import express from 'express';
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { randomBytes, createHash } from 'crypto';
+import { randomBytes } from 'crypto';
 import cors from 'cors';
 import multer from 'multer';
 
@@ -16,143 +16,126 @@ app.use(express.static(join(__dir, 'public')));
 
 // ── DB (Stateless Vercel Support) ──
 const DB_SCRIPTS = join(__dir, 'data', 'scripts.json');
-const DB_KEYS    = join(__dir, 'data', 'keys.json');
-const DB_STATS   = join(__dir, 'data', 'stats.json');
+const readDB = (p, d={}) => { try { return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : d; } catch { return d; } };
 
-const readDB = (p, d={}) => {
-    try {
-        return existsSync(p) ? JSON.parse(readFileSync(p, 'utf8')) : d;
-    } catch { return d; }
-};
-
-const writeDB = (p, d) => {
-    try {
-        // Vercel is read-only. We only write if not in production or to /tmp
-        if (process.env.VERCEL) {
-            console.log("[DB] Vercel environment detected - Write skipped (using memory).");
-            return;
-        }
-        writeFileSync(p, JSON.stringify(d, null, 2));
-    } catch (e) {
-        console.warn("[DB] Write failed (Normal for Vercel Serverless):", e.message);
-    }
-};
-
+// Note: On Vercel, this is read-only.
 let scripts = readDB(DB_SCRIPTS, {});
-let keys    = readDB(DB_KEYS, {});
-let stats   = readDB(DB_STATS, { blocked: 0 });
+let stats   = { blocked: 0 };
 let challenges = new Map();
 
-const saveScripts = () => writeDB(DB_SCRIPTS, scripts);
-const saveKeys = () => writeDB(DB_KEYS, keys);
-const saveStats = () => writeDB(DB_STATS, stats);
+// ── PREMIUM DENIED GUI (Lua) ──
+const DENIED_LUA = (reason) => `
+local function create_ui()
+    local sg = Instance.new("ScreenGui", game:GetService("CoreGui"))
+    sg.Name = "06xd_Firewall"
+    
+    local main = Instance.new("Frame", sg)
+    main.Size = UDim2.new(0, 420, 0, 180)
+    main.Position = UDim2.new(0.5, -210, 0.5, -90)
+    main.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    main.BorderSizePixel = 0
+    
+    local gradient = Instance.new("UIGradient", main)
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 20, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(10, 10, 15))
+    })
+    
+    local stroke = Instance.new("UIStroke", main)
+    stroke.Color = Color3.fromRGB(239, 68, 68)
+    stroke.Thickness = 2
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    
+    local corner = Instance.new("UICorner", main)
+    corner.CornerRadius = UDim.new(0, 12)
+    
+    local icon = Instance.new("TextLabel", main)
+    icon.Size = UDim2.new(0, 50, 0, 50)
+    icon.Position = UDim2.new(0.5, -25, 0, 20)
+    icon.BackgroundTransparency = 1
+    icon.Text = "⚠️"
+    icon.TextSize = 40
+    
+    local title = Instance.new("TextLabel", main)
+    title.Size = UDim2.new(1, 0, 0, 30)
+    title.Position = UDim2.new(0, 0, 0, 75)
+    title.BackgroundTransparency = 1
+    title.Text = "SECURITY BREACH DETECTED"
+    title.TextColor3 = Color3.fromRGB(239, 68, 68)
+    title.TextSize = 18
+    title.Font = Enum.Font.GothamBold
+    
+    local desc = Instance.new("TextLabel", main)
+    desc.Size = UDim2.new(1, -40, 0, 40)
+    desc.Position = UDim2.new(0, 20, 0, 105)
+    desc.BackgroundTransparency = 1
+    desc.Text = "Reason: ${reason}\\nHardware fingerprint logged."
+    desc.TextColor3 = Color3.fromRGB(150, 150, 160)
+    desc.TextSize = 14
+    desc.Font = Enum.Font.Gotham
+    desc.TextWrapped = true
+end
 
-// ── UNIVERSAL BOT BLOCKER ──
-function getFirewallVerdict(req) {
-    const ua = req.headers['user-agent'] || '';
-    const hwid = req.headers['sentinel-hwid'] || '';
-    if (!ua.includes('Roblox')) return 'UNAUTHORIZED_CLIENT';
-    const bots = ['axios', 'node-fetch', 'Puppeteer', 'Postman', 'curl', 'Go-http-client'];
-    for (const p of bots) if (ua.toLowerCase().includes(p)) return 'BOT_DETECTED';
-    if (req.headers['x-execution-engine'] || req.headers['delta-fingerprint']) return 'SPOOFER_DETECTED';
-    return null;
-}
+pcall(create_ui)
+error("[0.6xd Firewall]: Access Denied. Reason: ${reason}", 0)
+`;
 
-const DENIED_LUA = (reason) => `-- [[ 0.6xd Protection | UNIVERSAL BLOCK ]]
-local _r="${reason}"
-warn("[0.6xd Firewall]: Access Denied. Reason: " .. _r)
-error("[0.6xd]: Security Breach Detected", 0)`;
-
-function createChallenge(host, hash) {
+function createChallenge(host, scriptId) {
     const token = randomBytes(12).toString('hex');
     const salt = Math.floor(Math.random() * 1000);
-    challenges.set(token, { hash, salt, ts: Date.now() });
-    setTimeout(() => challenges.delete(token), 45000); // 45s window
+    challenges.set(token, { scriptId, salt, ts: Date.now() });
+    setTimeout(() => challenges.delete(token), 60000);
 
-    return `-- [[ 0.6xd Security Challenge ]]
-local _H = "http://${host}/v1/verify/${token}"
+    const origin = host.includes('localhost') ? `http://${host}` : `https://${host}`;
+
+    return `-- [[ 0.6xd Security Challenge | Handshake V5 ]]
+local _H = "${origin}/v1/verify/${token}"
 local _S = ${salt}
 local function solve(n) return (n * 2) + 1337 - _S end
-local success, res = pcall(game.HttpGet, game, _H .. "?sig=" .. solve(_S))
-if success and res and res:len() > 10 then
-  loadstring(res)()
+local s, res = pcall(game.HttpGet, game, _H .. "?sig=" .. solve(_S))
+if s and res and res:len() > 10 then
+  local load = loadstring(res)
+  if load then load() else warn("[0.6xd]: Failed to unpack payload") end
 else
-  error("Challenge Failed: Client Verification Required")
+  error("Handshake Failed: Authorization Required")
 end`;
-}
-
-// ── Obfuscator (V4 Virtualization) ──
-function obfuscate(src) {
-    const key = Math.floor(Math.random() * 255) + 1;
-    const enc = (s) => Buffer.from(s.split('').map(c => String.fromCharCode(c.charCodeAt(0) ^ key)).join(''), 'binary').toString('base64');
-    const chunks = [];
-    for (let i = 0; i < src.length; i += 60) chunks.push(enc(src.substring(i, i + 60)));
-    const tbl = chunks.map((c, i) => `[${i+1}]="${c}"`).join(',');
-    
-    return `local _K, _C = ${key}, {${tbl}}
-local function _D(s)
-  local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  s = s:gsub('[^'..b..'=]', '')
-  local r = {}
-  for i = 1, #s, 4 do
-    local v = 0
-    for j = 0, 3 do v = v * 64 + (b:find(s:sub(i + j, i + j)) - 1) end
-    for j = 2, 0, -1 do table.insert(r, string.char(math.floor(v / 256 ^ j) % 256)) end
-  end
-  for i = 1, #r do r[i] = string.char(r[i]:byte() ~ _K) end
-  return table.concat(r)
-end
-local _S = ""
-for i = 1, #_C do _S = _S .. _D(_C[i]) end
-loadstring(_S)()`;
 }
 
 // ── API ──
 
-app.get('/files/v4/loaders/:hash', (req, res) => {
-    const verdict = getFirewallVerdict(req);
-    if (verdict) { stats.blocked++; saveStats(); return res.send(DENIED_LUA(verdict)); }
-    const hash = req.params.hash.replace(/\.lua$/, '');
-    res.type('text/plain').send(createChallenge(req.headers.host, hash));
+// V5 Keyless Direct Loader (Uses Script ID directly)
+app.get('/files/v5/loaders/:scriptId', (req, res) => {
+    const id = req.params.scriptId.replace(/\.lua$/, '');
+    res.type('text/plain').send(createChallenge(req.headers.host, id));
 });
 
 app.get('/v1/verify/:token', (req, res) => {
     const { token } = req.params;
     const { sig } = req.query;
     const challenge = challenges.get(token);
-    if (!challenge) return res.send('-- CHALLENGE_EXPIRED');
-    const expected = (challenge.salt * 2) + 1337 - challenge.salt;
-    if (parseInt(sig) !== expected) return res.send('-- INVALID_SIGNATURE');
+    
+    if (!challenge) return res.send('-- Handshake Expired');
+    if (parseInt(sig) !== (challenge.salt * 2) + 1337 - challenge.salt) return res.send('-- Breach Detected');
 
-    const k = Object.values(keys).find(k => k.loaderHash === challenge.hash);
-    if (!k) return res.send('-- NOT_FOUND');
-    const s = scripts[k.scriptId];
-    if (!s) return res.send('-- DELETED');
+    // On stateless Vercel, we can only serve scripts that were COMMITTED to scripts.json
+    // If it's a new script, it only stays in memory for a few minutes.
+    const s = scripts[challenge.scriptId];
+    if (!s) return res.send('-- [0.6xd Error]: Script not deployed to production. Push to GitHub to finalize.');
 
     challenges.delete(token);
     res.type('text/plain').send(s.src);
 });
 
+// For local development only:
 app.post('/v1/protect', upload.single('script'), (req, res) => {
     const src = req.file?.buffer?.toString('utf8') || req.body?.source;
     if (!src) return res.status(400).json({ error: 'Empty' });
     const id = 'sc_' + Math.random().toString(36).slice(2, 8);
-    scripts[id] = { id, name: req.body.name || 'Script', added: Date.now(), src: obfuscate(src) };
-    saveScripts();
+    // Note: This won't persist on Vercel unless added to scripts.json manually.
+    scripts[id] = { id, name: req.body.name || 'Script', src };
     res.json({ id });
 });
 
-app.post('/v1/keys/generate', (req, res) => {
-    const { scriptId } = req.body;
-    if (!scripts[scriptId]) return res.json({ error: '404' });
-    const key = '06XD-' + randomBytes(4).toString('hex').toUpperCase();
-    const hash = randomBytes(16).toString('hex');
-    keys[key] = { key, loaderHash: hash, scriptId, created: Date.now() };
-    saveKeys();
-    const origin = req.headers.host.includes('localhost') ? `http://${req.headers.host}` : `https://${req.headers.host}`;
-    res.json({ key, loader: `loadstring(game:HttpGet("${origin}/files/v4/loaders/${hash}.lua"))()` });
-});
+app.get('/', (req, res) => res.json({ status: 'LIVE', engine: 'V5-Industrial' }));
 
-app.get('/', (req, res) => res.json({ status: 'LIVE', engine: 'VanderProtectionV4', blocked: stats.blocked }));
-
-export default app; // Vercel Bridge
+export default app;
