@@ -89,21 +89,21 @@ function obfuscate(src) {
     for (let i = 0; i < src.length; i += 60) chunks.push(enc(src.substring(i, i + 60)));
     const tbl = chunks.map((c, i) => `[${i+1}]="${c}"`).join(',');
     
-    return `local _K,_C = ${key},{${tbl}}
+    return `local _K, _C = ${key}, {${tbl}}
 local function _D(s)
-  local b='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
-  s=s:gsub('[^'..b..'=]','')
+  local b = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  s = s:gsub('[^'..b..'=]', '')
   local r = {}
-  for i=1,#s,4 do
-    local v=0
-    for j=0,3 do v=v*64+(b:find(e:sub(i+j,i+j))-1) end
-    for j=2,0,-1 do table.insert(r, string.char(math.floor(v/256^j)%256)) end
+  for i = 1, #s, 4 do
+    local v = 0
+    for j = 0, 3 do v = v * 64 + (b:find(s:sub(i + j, i + j)) - 1) end
+    for j = 2, 0, -1 do table.insert(r, string.char(math.floor(v / 256 ^ j) % 256)) end
   end
-  for i=1,#r do r[i]=string.char(r[i]:byte()~_K) end
+  for i = 1, #r do r[i] = string.char(r[i]:byte() ~ _K) end
   return table.concat(r)
 end
 local _S = ""
-for i=1,#_C do _S = _S .. _D(_C[i]) end
+for i = 1, #_C do _S = _S .. _D(_C[i]) end
 loadstring(_S)()`;
 }
 

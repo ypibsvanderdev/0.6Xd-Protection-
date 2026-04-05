@@ -607,7 +607,8 @@ loadstring(_D(_E))()`;
 
 // ── Loader Logic ──────────────────────────────────────────────────────────
 function makeLoader(loaderHash) {
-  return `loadstring(game:HttpGet("${window.location.origin}/files/v4/loaders/${loaderHash}.lua"))()`;
+  const origin = window.location.origin;
+  return `loadstring(game:HttpGet("${origin}/files/v4/loaders/${loaderHash}.lua"))()`;
 }
 
 // ── File handling ──────────────────────────────────────────────────────────
@@ -670,7 +671,7 @@ function protectScript() {
   const protLabel = prot === 'galactic' ? 'Galactic V2' : prot === 'max' ? 'Max' : prot === 'none' ? 'None' : 'Standard';
   const script = { id, name, protection: protLabel, added: Date.now(), keyCount: 0, src: protected_src };
   SCRIPTS.unshift(script); save();
-  const loader = makeLoader(script, '', 'minimal');
+  const loader = makeLoader(script.id);
   document.getElementById('loader-code').textContent = loader;
   document.getElementById('result-card').style.display = 'block';
   notify('✅ Script protected!');
@@ -793,9 +794,8 @@ function generateKey() {
   const expiresMap = { never:null, '1d':86400000, '7d':604800000, '30d':2592000000, '90d':7776000000, '1y':31536000000 };
   const exp = expiresMap[expChoice] ? Date.now() + expiresMap[expChoice] : null;
   const loaderHash = [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
-  const loaderUrl  = `http://localhost:3567/files/v4/loaders/${loaderHash}.lua`;
-  const loader     = `loadstring(game:HttpGet("${loaderUrl}"))()`;
-  const key = { key: genKey(), loaderHash, loaderUrl, loader, scriptId, scriptName: script.name, expires: exp, hwid: hwid||null, note: note||null, execs: 0, created: Date.now() };
+  const loader     = makeLoader(loaderHash);
+  const key = { key: genKey(), loaderHash, loader, scriptId, scriptName: script.name, expires: exp, hwid: hwid||null, note: note||null, execs: 0, created: Date.now() };
   KEYS.unshift(key);
   script.keyCount = (script.keyCount||0)+1;
   save();
