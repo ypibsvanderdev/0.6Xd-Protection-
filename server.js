@@ -149,7 +149,8 @@ app.post('/v1/keys/generate', (req, res) => {
     const hash = randomBytes(16).toString('hex');
     keys[key] = { key, loaderHash: hash, scriptId, created: Date.now() };
     saveKeys();
-    res.json({ key, loader: `loadstring(game:HttpGet("http://${req.headers.host}/files/v4/loaders/${hash}.lua"))()` });
+    const origin = req.headers.host.includes('localhost') ? `http://${req.headers.host}` : `https://${req.headers.host}`;
+    res.json({ key, loader: `loadstring(game:HttpGet("${origin}/files/v4/loaders/${hash}.lua"))()` });
 });
 
 app.get('/', (req, res) => res.json({ status: 'LIVE', engine: 'VanderProtectionV4', blocked: stats.blocked }));
