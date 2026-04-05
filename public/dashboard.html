@@ -3,145 +3,105 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Dashboard – 0.6xd Protection</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<title>0.6xd Protection V4</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&family=JetBrains+Mono&display=swap" rel="stylesheet">
 <style>
-/* ── [V3 AESTHETIC REFRESH] ── */
-:root {
-  --bg: #050508; --bg2: #09090f; --card: #0e0e1a; --border: #1a1a2e; --accent: #7c3aed; --text: #e2e8f0; --muted: #64748b;
-  --success: #10b981; --danger: #ef4444; --sidebar: 220px;
-}
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; }
-.sidebar { width: var(--sidebar); min-height: 100vh; background: var(--bg2); border-right: 1px solid var(--border); position: fixed; left: 0; top: 0; display: flex; flex-direction: column; z-index: 50; }
-.sb-logo { padding: 1.5rem; font-weight: 800; border-bottom: 1px solid var(--border); }
-.sb-item { padding: 0.75rem 1.5rem; font-size: 0.85rem; color: var(--muted); cursor: pointer; transition: 0.2s; }
-.sb-item:hover, .sb-item.active { color: #a78bfa; background: rgba(124,58,237,0.1); }
-.main { margin-left: var(--sidebar); flex: 1; padding: 2rem; min-height: 100vh; }
-.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; }
-.btn { padding: 0.5rem 1.25rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; font-size: 0.85rem; }
+:root { --bg: #050508; --card: #0e0e1a; --border: #1a1a2e; --accent: #7c3aed; --text: #e2e8f0; --muted: #64748b; }
+body { background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; display: flex; margin: 0; }
+.sidebar { width: 220px; min-height: 100vh; background: #09090f; border-right: 1px solid var(--border); padding: 1.5rem; position: fixed; }
+.main { margin-left: 220px; flex: 1; padding: 2rem; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 1rem; }
+.btn { padding: 0.5rem 1rem; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; font-size: 0.8rem; }
 .btn-primary { background: var(--accent); color: white; }
-.btn-ghost { background: transparent; color: var(--text); border: 1px solid var(--border); }
-.table-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
-th { text-align: left; font-size: 0.7rem; color: var(--muted); text-transform: uppercase; padding: 0.75rem; border-bottom: 1px solid var(--border); }
-td { padding: 0.75rem; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); }
-.code-block { background: #000; border: 1px solid var(--border); padding: 1rem; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; overflow-x: auto; position: relative; margin-top: 1rem; }
-.notif { position: fixed; bottom: 2rem; right: 2rem; background: var(--accent); padding: 1rem 1.5rem; border-radius: 8px; color: white; transform: translateY(100px); opacity: 0; transition: 0.3s; z-index: 1000; }
-.notif.show { transform: translateY(0); opacity: 1; }
+.btn-danger { background: #ef4444; color: white; }
+.code { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; background: #000; padding: 0.75rem; border-radius: 6px; overflow-x: auto; margin: 0.5rem 0; word-break: break-all; color: #a78bfa; }
 </style>
 </head>
 <body>
 
 <aside class="sidebar">
-  <div class="sb-logo">0.6xd Protection V4</div>
-  <div class="sb-item active" onclick="nav('scripts')">🔒 Scripts</div>
-  <div class="sb-item" onclick="nav('keys')">🔑 Keys</div>
+  <div style="font-weight:800;margin-bottom:2rem">0.6xd Protection V4</div>
+  <div onclick="location.reload()" style="cursor:pointer;color:var(--muted);font-size:0.8rem;margin-bottom:1rem">📊 Refresh</div>
+  <button class="btn btn-danger" style="width:100%;font-size:0.7rem;opacity:0.5" onclick="purge()">💀 PURGE LOCAL DATA</button>
 </aside>
 
 <main class="main">
-  <div id="page-scripts" class="page">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
-      <h2>Your Scripts</h2>
-      <button class="btn btn-primary" onclick="showPrompt()">+ Protect New</button>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Scripts</h3>
+      <button class="btn btn-primary" onclick="addScript()">+ Add Script</button>
     </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>ID</th><th>Name</th><th>Status</th><th>Actions</th></tr></thead>
-          <tbody id="scripts-table"></tbody>
-        </table>
-      </div>
-    </div>
+    <div id="scripts"></div>
   </div>
 
-  <div id="page-keys" class="page" style="display:none">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem">
-      <h2>Active Keys</h2>
-      <button class="btn btn-primary" onclick="genNewKey()">+ Create Key</button>
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Keys & Loaders</h3>
+      <button class="btn btn-primary" onclick="addKey()">+ Create Key</button>
     </div>
-    <div class="card">
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Key</th><th>Script ID</th><th>Loader URL</th><th>Actions</th></tr></thead>
-          <tbody id="keys-table"></tbody>
-        </table>
-      </div>
-    </div>
+    <div id="keys"></div>
   </div>
 </main>
 
-<div class="notif" id="notif"></div>
-
 <script>
-// ── STATE ──
 let SCRIPTS = JSON.parse(localStorage.getItem('06xd-scripts') || '[]');
 let KEYS = JSON.parse(localStorage.getItem('06xd-keys') || '[]');
 
 function save() {
-  localStorage.setItem('06xd-scripts', JSON.stringify(SCRIPTS));
-  localStorage.setItem('06xd-keys', JSON.stringify(KEYS));
+    localStorage.setItem('06xd-scripts', JSON.stringify(SCRIPTS));
+    localStorage.setItem('06xd-keys', JSON.stringify(KEYS));
 }
 
-// ── 🛡️ AUTO-REPAIR ENGINE ──
-function repair() {
-    let repaired = false;
-    KEYS.forEach(k => {
-        if (typeof k.loader === 'string' && k.loader.includes('[object Object]')) {
-            const hash = k.loaderHash || 'repaired_' + Math.random().toString(36).slice(2, 10);
-            k.loader = `loadstring(game:HttpGet("${window.location.origin}/files/v4/loaders/${hash}.lua"))()`;
-            repaired = true;
-        }
-    });
-    if (repaired) { save(); console.warn("[REPAIR] Corrupted loaders fixed."); }
-}
-repair();
-
-// ── UI ──
-function nav(pg) {
-  document.querySelectorAll('.page').forEach(p=>p.style.display='none');
-  document.getElementById('page-'+pg).style.display='block';
-  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'));
-  document.querySelector(`[onclick="nav('${pg}')"]`).classList.add('active');
-  if(pg==='scripts') renderScripts(); if(pg==='keys') renderKeys();
+function purge() {
+    if(confirm("THIS WILL DELETE ALL LOCAL SCRIPTS AND KEYS. CONTINUE?")) {
+        localStorage.clear(); location.reload();
+    }
 }
 
-function notify(m) { const n=document.getElementById('notif'); n.textContent=m; n.classList.add('show'); setTimeout(()=>n.classList.remove('show'),3000); }
+function render() {
+    const sDiv = document.getElementById('scripts');
+    sDiv.innerHTML = SCRIPTS.map(s => `
+        <div style="padding:1rem;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+            <div><span style="font-weight:700">${s.name}</span> <span style="color:var(--muted);font-size:0.7rem">(${s.id})</span></div>
+            <button onclick="delScript('${s.id}')" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+        </div>
+    `).join('') || '<div style="color:var(--muted);padding:1rem">No scripts added.</div>';
 
-function renderScripts() {
-  const t = document.getElementById('scripts-table');
-  t.innerHTML = SCRIPTS.map(s => `<tr><td>${s.id}</td><td>${s.name}</td><td>Active</td><td><button class="btn btn-ghost" onclick="deleteScript('${s.id}')">Delete</button></td></tr>`).join('') || '<tr><td colspan="4">No scripts yet.</td></tr>';
+    const kDiv = document.getElementById('keys');
+    kDiv.innerHTML = KEYS.map(k => `
+        <div style="padding:1rem;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;margin-bottom:0.5rem">
+                <span style="font-family:monospace;font-weight:700">${k.key}</span>
+                <button onclick="delKey('${k.key}')" style="background:none;border:none;color:#ef4444;cursor:pointer">✕</button>
+            </div>
+            <div class="code">${k.loader}</div>
+            <button class="btn btn-primary" style="font-size:0.7rem;padding:0.3rem 0.6rem" onclick="copy('${k.loader}')">Copy Loader</button>
+        </div>
+    `).join('') || '<div style="color:var(--muted);padding:1rem">No keys. Create one to get a loader.</div>';
 }
 
-function renderKeys() {
-  const t = document.getElementById('keys-table');
-  t.innerHTML = KEYS.map(k => `<tr><td style="font-family:monospace">${k.key}</td><td>${k.scriptId}</td><td style="font-size:0.7rem">${k.loader}</td><td><button class="btn btn-ghost" onclick="copy('${k.loader}')">Copy</button></td></tr>`).join('') || '<tr><td colspan="4">No keys yet.</td></tr>';
-}
-
-function copy(t) { navigator.clipboard.writeText(t); notify('✅ Copied Loader!'); }
-
-function deleteScript(id) { SCRIPTS = SCRIPTS.filter(s=>s.id!==id); save(); renderScripts(); }
-
-async function showPrompt() {
-    const name = prompt("Script Name:", "Vander Duels"); if(!name) return;
-    const source = prompt("Enter Script Source Code:"); if(!source) return;
+function addScript() {
+    const name = prompt("Script Name:", "Target Script"); if(!name) return;
     const id = 'sc_' + Math.random().toString(36).slice(2, 8);
-    SCRIPTS.unshift({ id, name, added: Date.now() });
-    save(); renderScripts(); notify('✅ Script protected local-side');
+    SCRIPTS.unshift({ id, name }); save(); render();
 }
 
-function genNewKey() {
-    if(SCRIPTS.length === 0) return notify('🚫 Add a script first');
-    const scriptId = SCRIPTS[0].id; // Just use first script for this demo
+function addKey() {
+    if(SCRIPTS.length === 0) return alert("Add a script first!");
+    const scriptId = SCRIPTS[0].id;
     const key = '06XD-' + Math.random().toString(36).slice(2, 6).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase();
     const hash = [...crypto.getRandomValues(new Uint8Array(16))].map(b=>b.toString(16).padStart(2,'0')).join('');
     const origin = window.location.origin;
     const loader = `loadstring(game:HttpGet("${origin}/files/v4/loaders/${hash}.lua"))()`;
-    KEYS.unshift({ key, scriptId, loaderHash: hash, loader, created: Date.now() });
-    save(); renderKeys(); notify('✅ Key & Loader Generated!');
+    KEYS.unshift({ key, scriptId, loaderHash: hash, loader });
+    save(); render();
 }
 
-renderScripts();
+function delScript(id) { SCRIPTS = SCRIPTS.filter(s=>s.id!==id); save(); render(); }
+function delKey(k) { KEYS = KEYS.filter(key=>key.key!==k); save(); render(); }
+function copy(t) { navigator.clipboard.writeText(t); alert("✅ Copied to clipboard!"); }
+
+render();
 </script>
 </body>
 </html>
